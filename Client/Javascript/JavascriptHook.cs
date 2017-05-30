@@ -9,6 +9,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Windows.Forms;
+using System.Text;
+using System.Reflection;
 using GTA;
 using GTA.Math;
 using GTA.Native;
@@ -135,6 +137,12 @@ namespace GTANetwork.Javascript
             ThreadJumper = new List<Action>();
             TextElements = new List<UIResText>();
             Exported = new ExpandoObject();
+
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("GTANetwork.Javascript.ScriptLoader.js"))
+            using (StreamReader reader = new StreamReader(stream))
+            {
+                ScriptLoader = reader.ReadToEnd();
+            }
         }
 
         internal static PointF MousePosition { get; set; }
@@ -150,6 +158,7 @@ namespace GTANetwork.Javascript
         internal static WaveStream AudioReader { get; set; }
 
         internal static ExpandoObject Exported { get; set; }
+        internal static string ScriptLoader;
 
         internal static void InvokeServerEvent(string eventName, string resource, object[] arguments)
         {
@@ -376,9 +385,10 @@ namespace GTANetwork.Javascript
         internal static ClientsideScriptWrapper StartScript(ClientsideScript script)
         {
             ClientsideScriptWrapper csWrapper;
-            var scriptEngine = new V8ScriptEngine(V8ScriptEngineFlags.EnableDebugging);
+            var scriptEngine = new V8ScriptEngine(V8ScriptEngineFlags.EnableDebugging); 
             //scriptEngine.AddHostObject("host", new HostFunctions()); // Disable an exploit where you could get reflection
             scriptEngine.AddHostObject("API", new ScriptContext(scriptEngine));
+            scriptEngine.AddHostObject("HostLogging", new ClientsideLoggingContext(script));
             scriptEngine.AddHostType("Enumerable", typeof(Enumerable));
             scriptEngine.AddHostType("List", typeof(List<>));
             scriptEngine.AddHostType("Dictionary", typeof(Dictionary<,>));
@@ -402,7 +412,9 @@ namespace GTANetwork.Javascript
 
             try
             {
-                scriptEngine.Execute(script.Script);
+                // scriptEngine.Execute(script.Script);
+                scriptEngine.Execute(ScriptLoader);
+                scriptEngine.Invoke("loadScript", script);
                 scriptEngine.Script.API.ParentResourceName = script.ResourceParent;
             }
             catch (ScriptEngineException ex)
@@ -432,7 +444,16 @@ namespace GTANetwork.Javascript
                 foreach (var t in ScriptEngines)
                 {
                     t.Engine.Interrupt();
-                    t.Engine.Script.API.invokeResourceStop();
+
+                    try
+                    {
+                        t.Engine.Script.API.invokeResourceStop();
+                    }
+                    catch (Exception ex)
+                    {
+                        LogException(ex);
+                    }
+
                     t.Engine.Dispose();
                 }
                 ScriptEngines.Clear();
@@ -478,9 +499,19 @@ namespace GTANetwork.Javascript
                     for (int i = ScriptEngines.Count - 1; i >= 0; i--)
                     {
                         if (ScriptEngines[i].ResourceParent != resourceName) continue;
-                        ScriptEngines[i].Engine.Script.API.invokeResourceStop();
-                        ScriptEngines[i].Engine.Dispose();
-                        ScriptEngines.RemoveAt(i);
+                        try
+                        {
+                            ScriptEngines[i].Engine.Script.API.invokeResourceStop();
+                        }
+                        catch (Exception e)
+                        {
+                            LogException(e);
+                        }
+                        finally
+                        {
+                            ScriptEngines[i].Engine.Dispose();
+                            ScriptEngines.RemoveAt(i);
+                        }
                     }
                 }
 
@@ -509,6 +540,21 @@ namespace GTANetwork.Javascript
             }
 
             LogManager.LogException(ex, "CLIENTSIDE SCRIPT ERROR");
+        }
+    }
+    
+    // Most of this work is done in the ScriptLoader -> Console class.
+    public class ClientsideLoggingContext
+    {
+        private string filename;
+        public ClientsideLoggingContext(ClientsideScript script)
+        {
+            filename = script.Filename;
+        }
+
+        public void Log(string line)
+        {
+            LogManager.SimpleLog("Client", line);
         }
     }
 

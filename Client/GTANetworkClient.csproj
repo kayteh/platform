@@ -262,6 +262,7 @@
   <ItemGroup>
     <EmbeddedResource Include="soundlist.txt" />
     <EmbeddedResource Include="natives.txt" />
+    <EmbeddedResource Include="Javascript\ScriptLoader.js" />
     <Content Include="Properties\AssemblyInfo.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>AssemblyInfo.cs</LastGenOutput>
