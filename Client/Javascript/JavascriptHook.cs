@@ -412,7 +412,7 @@ namespace GTANetwork.Javascript
         internal static ClientsideScriptWrapper StartScript(ClientsideScript script)
         {
             ClientsideScriptWrapper csWrapper;
-            var scriptEngine = new V8ScriptEngine(V8ScriptEngineFlags.EnableDebugging);
+            var scriptEngine = new V8ScriptEngine(V8ScriptEngineFlags.EnableDebugging); 
             //scriptEngine.AddHostObject("host", new HostFunctions()); // Disable an exploit where you could get reflection
             scriptEngine.AddHostObject("API", new ScriptContext(scriptEngine));
             scriptEngine.AddHostObject("HostLogging", new ClientsideLoggingContext(script));
