@@ -138,7 +138,7 @@ namespace GTANetwork.Javascript
             TextElements = new List<UIResText>();
             Exported = new ExpandoObject();
 
-            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("GTANetwork.Javascript.ScriptLoader.js"))
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("GTANetwork.Javascript.Scripts.ScriptLoader.js"))
             using (StreamReader reader = new StreamReader(stream))
             {
                 ScriptLoader = reader.ReadToEnd();
@@ -435,7 +435,7 @@ namespace GTANetwork.Javascript
             {
                 foreach (var t in ScriptEngines)
                 {
-                    t.Engine.Script.API.isDisposing = true;
+                    //t.Engine.Script.API.isDisposing = true;
                 }
             }
 
@@ -443,7 +443,7 @@ namespace GTANetwork.Javascript
             {
                 foreach (var t in ScriptEngines)
                 {
-                    t.Engine.Interrupt();
+                    //t.Engine.Interrupt();
 
                     try
                     {
@@ -454,7 +454,9 @@ namespace GTANetwork.Javascript
                         LogException(ex);
                     }
 
-                    t.Engine.Dispose();
+                    //TODO(Katalina): re-dispose of resources.
+                    t.Engine.Script.Invoke("unloadScript", t.Engine.Script);
+                    //t.Engine.Dispose();
                 }
                 ScriptEngines.Clear();
             }
@@ -554,7 +556,7 @@ namespace GTANetwork.Javascript
 
         public void Log(string line)
         {
-            LogManager.SimpleLog("Client", line);
+            LogManager.SimpleLog("Client", "(" + filename + ") " + line);
         }
     }
 
