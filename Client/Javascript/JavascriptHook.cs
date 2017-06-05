@@ -165,6 +165,18 @@ namespace GTANetwork.Javascript
             ThreadJumper.Add(() =>
             {
                 lock (ScriptEngines)
+                    for (int i = ScriptEngines.Count - 1; i >= 0; i--)
+                    {
+                        try
+                        {
+                            if (resource != "*" && ScriptEngines[i].ResourceParent != resource) continue;
+                            ScriptEngines[i].Engine.Script.API.invokeServerEvent(eventName, arguments);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogException(ex);
+                        }
+                    }
                 for (int i = 0; i < ScriptEngines.Count; i++)
                 {
                     try
@@ -330,7 +342,7 @@ namespace GTANetwork.Javascript
 
             lock (ScriptEngines)
             {
-                for (var i = 0; i < ScriptEngines.Count; i++)
+                for (var i = ScriptEngines.Count - 1; i >= 0; i--)
                 { 
                     //try
                     //{
@@ -412,7 +424,7 @@ namespace GTANetwork.Javascript
         internal static ClientsideScriptWrapper StartScript(ClientsideScript script)
         {
             ClientsideScriptWrapper csWrapper;
-            var scriptEngine = new V8ScriptEngine(V8ScriptEngineFlags.EnableDebugging); 
+            var scriptEngine = new V8ScriptEngine(V8ScriptEngineFlags.EnableDebugging);
             //scriptEngine.AddHostObject("host", new HostFunctions()); // Disable an exploit where you could get reflection
             scriptEngine.AddHostObject("API", new ScriptContext(scriptEngine));
             scriptEngine.AddHostObject("HostLogging", new ClientsideLoggingContext(script));
