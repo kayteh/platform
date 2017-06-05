@@ -107,21 +107,21 @@ namespace GTANetwork.Javascript
 
         internal static void DisposeAudio()
         {
-            var t = new Thread((ThreadStart) delegate
-            {
-                try
-                {
-                    JavascriptHook.AudioDevice?.Stop();
-                    JavascriptHook.AudioDevice?.Dispose();
-                    JavascriptHook.AudioReader?.Dispose();
-                    JavascriptHook.AudioDevice = null;
-                    JavascriptHook.AudioReader = null;
-                }
-                catch (Exception ex)
-                {
-                    LogManager.LogException(ex, "DISPOSEAUDIO");
-                }
-            }) {IsBackground = true};
+            var t = new Thread((ThreadStart)delegate
+           {
+               try
+               {
+                   JavascriptHook.AudioDevice?.Stop();
+                   JavascriptHook.AudioDevice?.Dispose();
+                   JavascriptHook.AudioReader?.Dispose();
+                   JavascriptHook.AudioDevice = null;
+                   JavascriptHook.AudioReader = null;
+               }
+               catch (Exception ex)
+               {
+                   LogManager.LogException(ex, "DISPOSEAUDIO");
+               }
+           }) { IsBackground = true };
             t.Start();
         }
     }
@@ -138,7 +138,7 @@ namespace GTANetwork.Javascript
             TextElements = new List<UIResText>();
             Exported = new ExpandoObject();
 
-            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("GTANetwork.Javascript.Scripts.ScriptLoader.js"))
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("GTANetwork.Javascript.Scripts.bootstrapper.js"))
             using (StreamReader reader = new StreamReader(stream))
             {
                 ScriptLoader = reader.ReadToEnd();
@@ -165,18 +165,18 @@ namespace GTANetwork.Javascript
             ThreadJumper.Add(() =>
             {
                 lock (ScriptEngines)
-                for (int i = ScriptEngines.Count - 1; i >= 0; i--)
-                {
-                    try
+                    for (int i = ScriptEngines.Count - 1; i >= 0; i--)
                     {
-                        if (resource != "*" && ScriptEngines[i].ResourceParent != resource) continue;
-                        ScriptEngines[i].Engine.Script.API.invokeServerEvent(eventName, arguments);
+                        try
+                        {
+                            if (resource != "*" && ScriptEngines[i].ResourceParent != resource) continue;
+                            ScriptEngines[i].Engine.Script.API.invokeServerEvent(eventName, arguments);
+                        }
+                        catch (Exception ex)
+                        {
+                            LogException(ex);
+                        }
                     }
-                    catch (Exception ex)
-                    {
-                        LogException(ex);
-                    }
-                }
             });
         }
 
@@ -314,7 +314,7 @@ namespace GTANetwork.Javascript
                 {
                     //try
                     //{
-                        ScriptEngines[i].Engine.Script.API.invokeKeyDown(sender, e);
+                    ScriptEngines[i].Engine.Script.API.invokeKeyDown(sender, e);
                     //}
                     //catch (ScriptEngineException ex)
                     //{
@@ -331,7 +331,7 @@ namespace GTANetwork.Javascript
             lock (ScriptEngines)
             {
                 for (var i = ScriptEngines.Count - 1; i >= 0; i--)
-                { 
+                {
                     //try
                     //{
                     ScriptEngines[i].Engine.Script.API.invokeKeyUp(sender, e);
@@ -344,6 +344,44 @@ namespace GTANetwork.Javascript
             }
         }
 
+        //internal static void StartScriptsOld(ScriptCollection sc)
+        //{
+        //    var localSc = new List<ClientsideScript>(sc.ClientsideScripts);
+
+        //    ThreadJumper.Add(() =>
+        //    {
+        //        var scripts = localSc.Select(StartScript).ToList();
+
+        //        var exportedDict = Exported as IDictionary<string, object>;
+
+        //        foreach (var group in scripts.GroupBy(css => css.ResourceParent))
+        //        {
+        //            dynamic thisRes = new ExpandoObject();
+        //            var thisResDict = (IDictionary<string, object>)thisRes;
+
+        //            foreach (var compiledResources in group)
+        //            {
+        //                thisResDict.Add(compiledResources.Filename, compiledResources.Engine.Script);
+        //            }
+
+        //            foreach (var wrapper in group)
+        //            {
+        //                wrapper.Engine.AddHostObject("resource", thisRes);
+        //            }
+
+        //            exportedDict.Add(group.Key, thisRes);
+        //        }
+
+        //        for (var index = scripts.Count - 1; index >= 0; index--)
+        //        {
+        //            var cr = scripts[index];
+        //            cr.Engine.AddHostObject("exported", Exported);
+
+        //            cr.Engine.Script.API.invokeResourceStart();
+        //        }
+        //    });
+        //}
+
         internal static void StartScripts(ScriptCollection sc)
         {
             var localSc = new List<ClientsideScript>(sc.ClientsideScripts);
@@ -351,33 +389,22 @@ namespace GTANetwork.Javascript
             ThreadJumper.Add(() =>
             {
                 var scripts = localSc.Select(StartScript).ToList();
-
-                var exportedDict = Exported as IDictionary<string, object>;
-
-                foreach (var group in scripts.GroupBy(css => css.ResourceParent))
+                for (int index = scripts.Count - 1; index >= 0; index--)
                 {
-                    dynamic thisRes = new ExpandoObject();
-                    var thisResDict = (IDictionary<string, object>) thisRes;
 
-                    foreach (var compiledResources in group)
+                    if (ReferenceEquals(null, scripts[index]))
                     {
-                        thisResDict.Add(compiledResources.Filename, compiledResources.Engine.Script);
+                        continue;
                     }
 
-                    foreach (var wrapper in group)
+                    try
                     {
-                        wrapper.Engine.AddHostObject("resource", thisRes);
+                        scripts[index].Engine.Script.API.invokeResourceStart();
+                    } catch (Exception ex)
+                    {
+                        // silent please
+                        LogManager.DebugLog(ex.ToString());
                     }
-
-                    exportedDict.Add(group.Key, thisRes);
-                }
-
-                for (var index = scripts.Count - 1; index >= 0; index--)
-                {
-                    var cr = scripts[index];
-                    cr.Engine.AddHostObject("exported", Exported);
-
-                    cr.Engine.Script.API.invokeResourceStart();
                 }
             });
         }
@@ -385,10 +412,11 @@ namespace GTANetwork.Javascript
         internal static ClientsideScriptWrapper StartScript(ClientsideScript script)
         {
             ClientsideScriptWrapper csWrapper;
-            var scriptEngine = new V8ScriptEngine(V8ScriptEngineFlags.EnableDebugging); 
+            var scriptEngine = new V8ScriptEngine(V8ScriptEngineFlags.EnableDebugging);
             //scriptEngine.AddHostObject("host", new HostFunctions()); // Disable an exploit where you could get reflection
             scriptEngine.AddHostObject("API", new ScriptContext(scriptEngine));
             scriptEngine.AddHostObject("HostLogging", new ClientsideLoggingContext(script));
+            scriptEngine.AddHostObject("ResourceManager", new ScriptResourceManager(script));
             scriptEngine.AddHostType("Enumerable", typeof(Enumerable));
             scriptEngine.AddHostType("List", typeof(List<>));
             scriptEngine.AddHostType("Dictionary", typeof(Dictionary<,>));
@@ -420,12 +448,11 @@ namespace GTANetwork.Javascript
             catch (ScriptEngineException ex)
             {
                 LogException(ex);
+                return null;
             }
-            finally
-            {
-                csWrapper = new ClientsideScriptWrapper(scriptEngine, script.ResourceParent, script.Filename);
-                lock (ScriptEngines) ScriptEngines.Add(csWrapper);
-            }
+
+            csWrapper = new ClientsideScriptWrapper(scriptEngine, script.ResourceParent, script.Filename);
+            lock (ScriptEngines) ScriptEngines.Add(csWrapper);
             return csWrapper;
         }
 
@@ -542,6 +569,65 @@ namespace GTANetwork.Javascript
             }
 
             LogManager.LogException(ex, "CLIENTSIDE SCRIPT ERROR");
+        }
+    }
+
+    public class ScriptResourceManager
+    {
+        private static Dictionary<string, object> ExportedResources = new Dictionary<string, object>();
+        private static HashSet<string> KnownResources = new HashSet<string>();
+
+        private ClientsideScript script;
+
+        public ScriptResourceManager(ClientsideScript script)
+        {
+            this.script = script;
+            lock (KnownResources)
+            {
+                KnownResources.Add(script.ResourceParent);
+            }
+        }
+
+        public void Export(object moduleExports)
+        {
+            lock(ExportedResources)
+            {
+                ExportedResources.Add($"{script.ResourceParent}/{script.Filename}", moduleExports);
+            }
+        }
+
+        public bool HasResource(string resource)
+        {
+            return KnownResources.Contains(resource);
+        }
+
+        public bool HasExported(string resource, string filename)
+        {
+            if (resource == ".")
+            {
+                resource = script.ResourceParent;
+            }
+
+            return ExportedResources.ContainsKey($"{resource}/{filename}");
+        }
+
+        // TODO: relative resources?
+        // Will need to change proto data and server to make it work out.
+        public object Require(string path)
+        {
+            if (path.StartsWith("./"))
+            {
+                path = $"{script.ResourceParent}/{path.Substring(2)}";
+            }
+
+            if (ExportedResources.ContainsKey(path))
+            {
+                return ExportedResources[path];
+            } 
+            else
+            {
+                return null;
+            }
         }
     }
     

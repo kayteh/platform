@@ -1,5 +1,5 @@
 {
   "standard": {
-    "globals": [ "API", "resource", "exported", "Keys", "Point", "Vector3", "Size", "HostLogging", "HostExporter" ]
+    "globals": [ "API", "resource", "exported", "Keys", "Point", "Vector3", "Size", "HostLogging", "ResourceManager" ]
   }
 }
